@@ -1,0 +1,11 @@
+1. Copy music in the data directory.
+2. start pyMD-Server.py
+3. start pyMD-Client.py
+   support Commands:
+	getdb = get the current files in directory data
+        load:{music title} = load music file from db example: load:music.ogg
+        play = start the music 
+
+
+pyMusicDemon is Alpha 0.3
+pyMD-Client is a example in the future will replace with a webserver 
