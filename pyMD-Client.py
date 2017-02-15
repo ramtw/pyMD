@@ -26,13 +26,18 @@ import socket
 import sys
 
 if __name__ == "__main__":
+    host = input("Server adress: ")
+    port = input("Port: ")
+    passwd = pyMD.get_hashfrompass(input("Server password: "))
+    
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while True:
-        msg = input('Enter player Command: ')
-        s.sendto(str.encode("0:" + msg), ('localhost', 8089))
+        msg = input(host + ":" + port + " > ")
+        msg = str(passwd) + "#" + str(msg)
+        s.sendto(str.encode(msg), (host, int(port)))
         
         data, addr = s.recvfrom(2048)
         len = int(data)
         for i in range(len):
             data, addr = s.recvfrom(2048)
-            print(data)
+            print(data.decode("utf-8"))

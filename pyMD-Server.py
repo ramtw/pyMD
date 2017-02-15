@@ -31,16 +31,23 @@ import sys
 import hashlib
 import socket
 import pyMD
+from enum import Enum
 
 if __name__ == "__main__":
     def end_callback(event, vlcplayer):
-        print('End of media stream (event %s)' % event.type)
+        vlcplayer.setend()
     def pos_callback(event, vlcplayer):
-        vlcplayer.m_playerpos = vlcplayer.get_vlc().get_position() * 100
+        vlcplayer.m_playerpos = vlcplayer.get_vlc().get_position() 
 
 
         
-    
+    class status(Enum):
+        INIT = 1
+        LOAD = 2
+        PLAY = 3
+        PAUSED = 4
+        STOP = 5
+                
     
     class vlcplayer:
         MusicList = []
@@ -49,26 +56,39 @@ if __name__ == "__main__":
             print("Start vlc system")
             self.m_data = config.get_music_path()
             self.m_playerpos = 0
-            self.m_player =  vlc.Instance().media_player_new()
+            self.m_vlc = vlc.Instance("--no-xlib")
+            self.m_player =  self.m_vlc.media_player_new()
             self.event_manager =self.m_player.event_manager()
             self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, end_callback, self)
             self.event_manager.event_attach(vlc.EventType.MediaPlayerPositionChanged, pos_callback, self)
             self.m_player.audio_set_volume(config.get_music_volume())
+            self.m_status = status.INIT
             print("Create music list")
             vlcplayer.MusicList = [f for f in os.listdir(self.m_data) if os.path.isfile(os.path.join(self.m_data, f))]
         def setfile(self,name):
             file = os.path.join(self.m_data,name) 
-            Media =  vlc.Instance().media_new(str(file))
+            Media =  self.m_vlc.media_new(str(file))
             self.m_player.set_media(Media)
+            self.m_status = status.LOAD
             return "load file: " + file
+        def stream(self, file):
+            Media =  self.m_vlc.media_new(str(file))
+            self.m_player.set_media(Media)
+            self.m_status = status.LOAD
+            return ""
         def play(self):
             self.m_player.play()
+            self.m_status = status.PLAY
             return "play file"
         def get_vlc(self):
             return self.m_player
+        def get_status(self):
+            return self.m_status
         def list_music(self):
             for title in vlcplayer.MusicList:
                 print( title)
+        def setend(self):
+            self.m_status = status.STOP
             
     
 
@@ -77,26 +97,62 @@ if __name__ == "__main__":
             self.m_cfg = pyMD.config()
             self.m_player = vlcplayer(self.m_cfg)
             self.m_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.m_socket.bind(('localhost', self.m_cfg.get_server_port()))
+            self.m_socket.bind((self.m_cfg.get_server_addr(),
+                                self.m_cfg.get_server_port()))
         def start(self):
             print ("Listening on %s:%d..." % ("localhost",
                        self.m_cfg.get_server_port()))
             while True:
-                data, addr = self.m_socket.recvfrom(2048)
-                args = data.decode("utf-8").split(":") 
+                try:
+                    data, addr = self.m_socket.recvfrom(2048)
+                    args = data.decode("utf-8").split("#") 
                 
-                #pass:com:argument
-
-                if "load" in args[1]:
-                    ex = self.m_player.setfile(args[2])
-                    self.sendinfo(addr, ex)
-                elif 'play' in args[1]:
-                    ex = self.m_player.play()
-                    self.sendinfo(addr, ex)
-                elif 'getdb' in args[1]:
-                    i = len(vlcplayer.MusicList)
-                    self.sendinfos(addr, i, vlcplayer.MusicList)
-
+                    #pass#com#argument
+                    if args[0] in self.m_cfg.get_server_pass():
+                        if "load" in args[1]:
+                            self.load(args[2], addr)
+                        elif "stream" in args[1]:
+                            self.stream(args[2], addr)
+                        elif 'play' in args[1]:
+                            self.play(addr)
+                        elif 'getdb' in args[1]:
+                            i = len(vlcplayer.MusicList)
+                            self.sendinfos(addr, i, vlcplayer.MusicList)
+                        elif 'getpos' in args[1]:
+                            self.getposition(addr)
+                        elif 'getstatus' in args[1]:
+                            self.getstatus(addr)
+                        elif 'help' in args[1]:
+                            self.help(addr)
+                        else:
+                            self.help(addr)
+                    else:
+                        self.sendinfo(addr, "wrong password")
+                except:
+                    pass
+        def load(self, cmd, addr):
+            self.sendinfo(addr, self.m_player.setfile(cmd))
+            return ex
+        def play(self, addr):
+            self.sendinfo(addr, self.m_player.play())
+            return ex
+        def stream(self, link, addr):
+            self.sendinfo(addr, self.m_player.stream(link))
+        def getposition(self, addr):
+            self.sendinfo(addr, str(self.m_player.m_playerpos))
+        def getstatus(self, addr):
+            self.sendinfo(addr, str(self.m_player.get_status()))
+        def getlenght(self):
+            pass
+        def help(self, addr):
+            msg = ["getdb = get the current files in directory data",
+                   "load#{music title} = load music file from db example: load#music.ogg",
+                   "stream#{http addr}",
+                   "getpos = get current play position",
+                   "play = start the music",
+                   "getstatus = get current status"]
+            i = len(msg)
+            self.sendinfos(addr, i, msg)
         def sendinfos(self, addr, i, args):
             self.m_socket.sendto(str.encode(str(i)), addr)
             for arg in args:

@@ -45,13 +45,12 @@ class config:
             print("config not found: create std config - please restart!")
             self.m_config['music'] = {'path': 'data',
                                       'volume': '80',
-                                      'soundcard': '0',
-                                      'channel':'2',
-                                      'bit':'16',
-                                      'samplerate': '44100'}
+                                      'soundcard': '0'}
             self.m_config['server'] = {'pass': get_hashfrompass("admin"),
                                        'port': '8089',
-                                       'user': 'admin'}
+                                       'bind': 'localhost',
+                                       'loggingLevel': '0',
+                                       'loggingFile': '/var/log/pyMD'}
             self.save()
             sys.exit(-1)
             
@@ -63,9 +62,12 @@ class config:
         return self.m_config['server']['pass']
     def get_server_port(self):
         return int(self.m_config['server']['port'])
-    def get_server_user(self):
-        return self.m_config['server']['user']
-        
+    def get_server_addr(self):
+        return self.m_config['server']['bind']
+    def get_server_loggingLevel(self):
+        return int(self.m_config['server']['loggingLevel'])
+    def get_server_loggingFile(self):
+        return self.m_config['server']['loggingFile'] 
 
     def set_music_path(self, path):
         self.m_config['music']['path'] = path
@@ -75,8 +77,6 @@ class config:
         self.m_config['server']['pass'] = get_hashfrompass(passwd)
     def set_server_port(self, port):
         self.m_config['server']['port'] = port
-    def set_server_user(self, user):
-        self.m_config['server']['user'] = user
     def save(self):
         with open(self.m_path, 'w') as configfile:
             self.m_config.write(configfile)
