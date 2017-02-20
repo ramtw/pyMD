@@ -7,18 +7,19 @@
 #
 # Authors: Anna-Sophia Schroeck <annasophia.schroeck at outlook.de>
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This library is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as
+# published by the Free Software Foundation; either version 2.1 of the
+# License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This library is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301 USA
 
 __author__ = "annas"
 __date__ = "$05.02.2017 04:39:03$"
@@ -39,7 +40,12 @@ if __name__ == "__main__":
         vlcplayer.m_playerpos = vlcplayer.get_vlc().get_position() 
 
 
-        
+    VERSION =  '0.8.23' 
+    CODENAME = 'Desenberg'
+    AUTHOR = 'Anna-Sophia Schroeck <pba3h11aso@t-online.de>'
+    PYMDString = "pyMD " + VERSION + ' ' + CODENAME 
+    
+    
     class status(Enum):
         INIT = 1
         LOAD = 2
@@ -99,6 +105,7 @@ if __name__ == "__main__":
             self.m_socket.bind((self.m_cfg.get_server_addr(),
                                 self.m_cfg.get_server_port()))
         def start(self):
+           
             print ("Listening on %s:%d..." % ("localhost",
                        self.m_cfg.get_server_port()))
             while True:
@@ -123,10 +130,16 @@ if __name__ == "__main__":
                             self.getstatus(addr)
                         elif 'help' in args[1]:
                             self.help(addr)
+                        elif pyMD.CL_HELLO in args[1]:
+                            print("Client connected ")
+                            self.sendinfo(addr, PYMDString)
+                        elif pyMD.CL_EXIT in args[1]:
+                            print("Client disconected ")
+                            self.sendinfo(addr, "bye bye")
                         else:
                             self.help(addr)
                     else:
-                        self.sendinfo(addr, "wrong password")
+                        self.sendinfo(addr, pyMD.ERR_PASSWD)
                 except:
                     pass
         def load(self, cmd, addr):
@@ -159,6 +172,10 @@ if __name__ == "__main__":
         def sendinfo(self, addr, info):
             self.m_socket.sendto(str.encode(str(1)), addr)
             self.m_socket.sendto(str.encode(info), addr)
+
+    print (PYMDString)
+    print (AUTHOR)
+    print ()
     
     pm = pymusic()
     pm.start()
