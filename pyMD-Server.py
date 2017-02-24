@@ -5,21 +5,29 @@
 # 
 # $Id: $
 #
-# Authors: Anna-Sophia Schroeck <annasophia.schroeck at outlook.de>
-#
-# This library is free software; you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License as
-# published by the Free Software Foundation; either version 2.1 of the
-# License, or (at your option) any later version.
-#
-# This library is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with this library; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301 USA
+# Copyright (c) 2017 Anna-Sophia Schroeck <annasophia.schroeck at outlook.de>
+
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+
+  # 1. The origin of this software must not be misrepresented; you must not
+     # claim that you wrote the original software. If you use this software
+     # in a product, an acknowledgment in the product documentation would be
+     # appreciated but is not required.
+  # 2. Altered source versions must be plainly marked as such, and must not be
+     # misrepresented as being the original software.
+  # 3. This notice may not be removed or altered from any source distribution.
+
+  
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 __author__ = "annas"
 __date__ = "$05.02.2017 04:39:03$"
@@ -31,6 +39,8 @@ import sys
 import hashlib
 import socket
 import pyMD
+import pyaes
+
 from enum import Enum
 
 if __name__ == "__main__":
@@ -40,10 +50,7 @@ if __name__ == "__main__":
         vlcplayer.m_playerpos = vlcplayer.get_vlc().get_position() 
 
 
-    VERSION =  '0.8.23' 
-    CODENAME = 'Desenberg'
-    AUTHOR = 'Anna-Sophia Schroeck <pba3h11aso@t-online.de>'
-    PYMDString = "pyMD " + VERSION + ' ' + CODENAME 
+   
     
     
     class status(Enum):
@@ -99,47 +106,53 @@ if __name__ == "__main__":
 
     class pymusic:
         def __init__(self):
-            self.m_cfg = pyMD.config()
+            self.m_cfg = pyMD.server_config()
             self.m_player = vlcplayer(self.m_cfg)
             self.m_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.m_socket.bind((self.m_cfg.get_server_addr(),
                                 self.m_cfg.get_server_port()))
         def start(self):
            
-            print ("Listening on %s:%d..." % ("localhost",
+            print ("Listening on %s:%d...\n" % (self.m_cfg.get_server_addr(),
                        self.m_cfg.get_server_port()))
+            print ("The hash for the client, check the configuration.")
+            print ("Server and client must have the same hash.")
+            
+            _hash = self.m_cfg.get_server_hash()
             while True:
                 try:
                     data, addr = self.m_socket.recvfrom(2048)
-                    args = data.decode("utf-8").split("#") 
-                
-                    #pass#com#argument
-                    if args[0] in self.m_cfg.get_server_pass():
-                        if "load" in args[1]:
-                            self.load(args[2], addr)
-                        elif "stream" in args[1]:
-                            self.stream(args[2], addr)
-                        elif 'play' in args[1]:
-                            self.play(addr)
-                        elif 'getdb' in args[1]:
-                            i = len(vlcplayer.MusicList)
-                            self.sendinfos(addr, i, vlcplayer.MusicList)
-                        elif 'getpos' in args[1]:
-                            self.getposition(addr)
-                        elif 'getstatus' in args[1]:
-                            self.getstatus(addr)
-                        elif 'help' in args[1]:
-                            self.help(addr)
-                        elif pyMD.CL_HELLO in args[1]:
-                            print("Client connected ")
-                            self.sendinfo(addr, PYMDString)
-                        elif pyMD.CL_EXIT in args[1]:
-                            print("Client disconected ")
-                            self.sendinfo(addr, "bye bye")
-                        else:
-                            self.help(addr)
+                    
+                    crtxt = pyMD.hexToByte(data.decode("utf-8"))
+                    crypt_aes = pyaes.AESModeOfOperationCTR(_hash)
+                    plaintext = crypt_aes.encrypt(crtxt)
+
+                    args =  plaintext.decode("utf-8").split("#") 
+                    #com#argument
+                    
+                    if "load" in args[0]:
+                        self.load(args[1], addr)
+                    elif "stream" in args[0]:
+                        self.stream(args[1], addr)
+                    elif 'play' in args[0]:
+                        self.play(addr)
+                    elif 'getdb' in args[0]:
+                        i = len(vlcplayer.MusicList)
+                        self.sendinfos(addr, i, vlcplayer.MusicList)
+                    elif 'getpos' in args[0]:
+                        self.getposition(addr)
+                    elif 'getstatus' in args[0]:
+                        self.getstatus(addr)
+                    elif 'help' in args[0]:
+                        self.help(addr)
+                    elif pyMD.CL_HELLO in args[0]:
+                        print("Client connected ")
+                        self.sendinfo(addr, pyMD.PYMDString)
+                    elif pyMD.CL_EXIT in args[0]:
+                        print("Client disconected ")
+                        self.sendinfo(addr, "bye bye")
                     else:
-                        self.sendinfo(addr, pyMD.ERR_PASSWD)
+                        self.help(addr)
                 except:
                     pass
         def load(self, cmd, addr):
@@ -151,7 +164,10 @@ if __name__ == "__main__":
         def stream(self, link, addr):
             self.sendinfo(addr, self.m_player.stream(link))
         def getposition(self, addr):
-            self.sendinfo(addr, str(self.m_player.m_playerpos))
+            if self.m_player.get_status() == pyMD.status.STOP:
+                self.sendinfo(addr, str(0))
+            else:
+                self.sendinfo(addr, str(self.m_player.m_playerpos))
         def getstatus(self, addr):
             self.sendinfo(addr, str(self.m_player.get_status()))
         def getlenght(self):
@@ -166,22 +182,27 @@ if __name__ == "__main__":
             i = len(msg)
             self.sendinfos(addr, i, msg)
         def sendinfos(self, addr, i, args):
-            self.m_socket.sendto(str.encode(str(i)), addr)
+            self.cryptsend(str(i), addr)
             for arg in args:
-                self.m_socket.sendto(str.encode(arg), addr)
+                 self.cryptsend(arg, addr)
         def sendinfo(self, addr, info):
-            self.m_socket.sendto(str.encode(str(1)), addr)
-            self.m_socket.sendto(str.encode(info), addr)
+            self.cryptsend(str(1), addr)
+            self.cryptsend(info, addr)
+        def cryptsend(self, plain, addr):
+             _hash = self.m_cfg.get_server_hash()
+             crypt_aes = pyaes.AESModeOfOperationCTR(_hash)
+             ciphertext = pyMD.byteToHex(crypt_aes.encrypt(plain))
+             self.m_socket.sendto(str.encode(ciphertext), addr)
+        
+            
 
-    print (PYMDString)
-    print (AUTHOR)
+    print (pyMD.PYMDString)
+    print (pyMD.AUTHOR)
     print ()
     
     pm = pymusic()
     pm.start()
     
-    #pl.setfile('music.ogg')
-    #pl.play()
     
         
         

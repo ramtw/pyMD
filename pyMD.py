@@ -24,6 +24,8 @@ import os
 import sys
 import hashlib
 import configparser
+import random
+import binascii
 
 ERR_PASSWD = "__err_passwd__"
 INF_SERDOWN = "__info_serverdown__"
@@ -31,42 +33,101 @@ INF_SERDOWN = "__info_serverdown__"
 CL_HELLO = "__client_hello__"
 CL_EXIT = "__client_bye__"
 
+VERSION = '0.91.5 AES'
+CODENAME = 'Pockenberg'
+AUTHOR = 'Anna-Sophia Schroeck <pba3h11aso@t-online.de>'
+PYMDString = 'pyMD ' + VERSION + ' ' + CODENAME
 
 def get_hashfrompass(passwd):
-    return hashlib.sha256(str.encode(passwd)).hexdigest()
+    salt = str(random.getrandbits(128))
+    dk = hashlib.sha256(str.encode(passwd + salt)).digest()
+    return dk
 
-def get_config_path():
+
+def byteToHex(byteHash):
+    return binascii.hexlify(byteHash).decode("utf-8")
+def hexToByte(hexHash):
+    return binascii.unhexlify(str.encode(hexHash))
+
+def get_config_path(file):
     if sys.platform.startswith('linux'):
-        return "/etc/pymd.ini"
+        return "/etc/" + file
     elif sys.platform.startswith('win'):
-        return "pymd.ini"
+        return file
     elif sys.platform.startswith('darwin'):
-        return "/etc/pymd.ini"
-class config: 
+        return "/etc/" + file
+
+def get_log_path():
+    if sys.platform.startswith('linux'):
+        return "/var/log/pymd.log"
+    elif sys.platform.startswith('win'):
+        return "pymd.log"
+    elif sys.platform.startswith('darwin'):
+        return "/var/log/pymd.log"
+class client_config:
     def __init__(self):
-        self.m_path = get_config_path()
+        self.m_path = get_config_path("pyMDClient.ini")
         self.m_config = configparser.ConfigParser()
         if os.path.isfile(self.m_path) == True :
             self.m_config.read(self.m_path)
         else:
-            print("config not found: create std config - please restart!")
+            print("[Client First run] Create config")
+            
+            host = input("Host: ")
+            port = input("Port: ")
+            has = input("hash: ")
+            self.m_config['client'] = {'hash': has,
+                                       'port': port,
+                                       'addr': host }
+            self.save()
+            self.m_config.read(self.m_path)
+
+    def save(self):
+        with open(self.m_path, 'w') as configfile:
+            self.m_config.write(configfile)
+    def get_server_port(self):
+        return int(self.m_config['client']['port'])
+    def get_server_addr(self):
+        return self.m_config['client']['addr']
+    def get_server_hash(self):
+        hexhash = self.m_config['client']['hash']
+        return hexToByte(hexhash)
+      
+        
+class server_config: 
+    def __init__(self):
+        self.m_path = get_config_path("pyMDServer.ini")
+        self.m_config = configparser.ConfigParser()
+        if os.path.isfile(self.m_path) == True :
+            self.m_config.read(self.m_path)
+        else:
+            print("[First run] Create config")
+            
+            passwd = input("Please enter the server password: ")
+            temp = get_hashfrompass(passwd)
+            
             self.m_config['music'] = {'path': 'data',
                                       'volume': '80',
                                       'soundcard': '0'}
-            self.m_config['server'] = {'pass': get_hashfrompass("admin"),
+            self.m_config['server'] = {'hash': byteToHex(temp),
                                        'port': '8089',
                                        'bind': 'localhost',
                                        'loggingLevel': '0',
-                                       'loggingFile': '/var/log/pyMD'}
+                                       'loggingFile': get_log_path() }
+
+            
             self.save()
-            sys.exit(-1)
+            self.m_config.read(self.m_path)
+
+
             
     def get_music_path(self):
         return self.m_config['music']['path']
     def get_music_volume(self):
         return int(self.m_config['music']['volume'])
-    def get_server_pass(self):
-        return self.m_config['server']['pass']
+    def get_server_hash(self):
+        hexhash =  self.m_config['server']['hash']
+        return hexToByte(hexhash)
     def get_server_port(self):
         return int(self.m_config['server']['port'])
     def get_server_addr(self):
@@ -81,7 +142,7 @@ class config:
     def set_music_volume(self, volume):
         self.m_config['music']['volume'] = volume
     def set_server_pass(self, passwd):
-        self.m_config['server']['pass'] = get_hashfrompass(passwd)
+        self.m_config['server']['hash'] = get_hashfrompass(passwd)
     def set_server_port(self, port):
         self.m_config['server']['port'] = port
     def save(self):
