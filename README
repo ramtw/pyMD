@@ -2,7 +2,7 @@
 2. start pyMD-Server.py
 3. start pyMD-Client.py
    support Commands:
-	please tipp "help"
+	Please type "help"
 
 pyMusicDemon is Alpha 0.8
 pyMD-Client is a example in the future will replace with a webserver 
